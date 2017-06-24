@@ -108,19 +108,19 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
   LandmarkObs closest_observation;
 
   // For each predicted landmark
-  for (LandmarkObs predLandmark : predicted) {
+  for (LandmarkObs pred_landmark : predicted) {
     // Run through each observed landmark
-    for (LandmarkObs obsLandmark : observations) {
+    for (LandmarkObs ob_landmark : observations) {
       // Calculate the Euclidean distance
-      distance = dist(predLandmark.x, predLandmark.y, obsLandmark.x, obsLandmark.y);
+      distance = dist(pred_landmark.x, pred_landmark.y, ob_landmark.x, ob_landmark.y);
       // Memorize the closest observation
       if (distance < min_distance) {
         min_distance = distance;
-        closest_observation = obsLandmark;
+        closest_observation = ob_landmark;
       }
     }
     // Assign the observed measurement to the predicted landmark
-    predLandmark.id = closest_observation.id;
+    pred_landmark.id = closest_observation.id;
     // Reset the minimum distance
     min_distance = numeric_limits<double>::max();
   }
@@ -146,6 +146,18 @@ void ParticleFilter::resample() {
 	// NOTE: You may find std::discrete_distribution helpful here.
 	//   http://en.cppreference.com/w/cpp/numeric/random/discrete_distribution
 
+  // Create a new vector for to store the survived particles
+  vector<Particle> survived_particles;
+
+  random_device rd;
+  mt19937 gen(rd());
+  discrete_distribution<> d(weights.begin(), weights.end());
+  for(int i = 0; i < num_particles; i++) {
+    // Add the survived particle to the vector
+    survived_particles.push_back(particles[d(gen)]);
+  }
+  // Replace the particles with the resampled particles
+  particles = survived_particles;
 }
 
 Particle ParticleFilter::SetAssociations(Particle particle, std::vector<int> associations, std::vector<double> sense_x, std::vector<double> sense_y)
