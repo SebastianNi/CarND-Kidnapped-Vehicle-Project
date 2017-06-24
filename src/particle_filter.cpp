@@ -25,6 +25,36 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 	// Add random Gaussian noise to each particle.
 	// NOTE: Consult particle_filter.h for more information about this method (and others in this file).
 
+  // Create a random engine
+  default_random_engine gen;
+
+  // Set the number of particles
+  num_particles = 100;
+
+  // Creates a normal (Gaussian) distribution for x, y and theta
+  normal_distribution<double> dist_x(x, std[0]);
+  normal_distribution<double> dist_y(y, std[1]);
+  normal_distribution<double> dist_theta(theta, std[2]);
+
+  for (int i = 0; i < num_particles; i++) {
+
+    // Create a new particle
+    Particle particle;
+
+    // Sample random Gaussian noise from normal distrubtions using the random engine
+    particle.x = dist_x(gen);
+    particle.y = dist_y(gen);
+    particle.theta = dist_theta(gen);
+
+    // Initialize the weight with 1.0
+    particle.weight = 1.0;
+
+    // Add the new particle to the vector of particles
+    particles.push_back(particle);
+  }
+
+  // Set the initialization status to true
+  is_initialized = true;
 }
 
 void ParticleFilter::prediction(double delta_t, double std_pos[], double velocity, double yaw_rate) {
@@ -33,6 +63,37 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 	//  http://en.cppreference.com/w/cpp/numeric/random/normal_distribution
 	//  http://www.cplusplus.com/reference/random/default_random_engine/
 
+  // Create a random engine
+  default_random_engine gen;
+
+  // Generate (Gaussian) noise for x, y and theta
+  normal_distribution<double> dist_x(0.0, std_pos[0]);
+  normal_distribution<double> dist_y(0.0, std_pos[1]);
+  normal_distribution<double> dist_theta(0.0, std_pos[2]);
+
+
+  if (abs(yaw_rate) > 0.00001) {
+
+    // Calculate theta_dot_dt as well as velocity divided by yaw_rate outside the loop to save calculation time
+    double theta_dot_dt = yaw_rate * delta_t;
+    double v_yr = velocity / yaw_rate;
+
+    // Predict the new state for each particle and add the (Gaussian) noise
+    for (Particle particle : particles) {
+      particle.x += v_yr * (sin(particle.theta + theta_dot_dt) - sin(particle.theta)) + dist_x(gen); // Noise is added at the end
+      particle.y += v_yr * (cos(particle.theta) - cos(particle.theta + theta_dot_dt)) + dist_y(gen); // Noise is added at the end
+      particle.theta += theta_dot_dt; // Noise is added at the end
+    }
+
+  } else {
+
+    // If the movement is nearly straight, avoid division by zero and use simpler formulas
+    for (Particle particle : particles) {
+      particle.x += velocity * cos(particle.theta) * delta_t + dist_x(gen); // Noise is added at the end
+      particle.y += velocity * sin(particle.theta) * delta_t + dist_y(gen); // Noise is added at the end
+      particle.theta += dist_theta(gen); // Noise is added at the end
+    }
+  }
 }
 
 void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::vector<LandmarkObs>& observations) {
@@ -40,6 +101,29 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
 	//   observed measurement to this particular landmark.
 	// NOTE: this method will NOT be called by the grading code. But you will probably find it useful to 
 	//   implement this method and use it as a helper during the updateWeights phase.
+
+
+  double distance;
+  double min_distance = numeric_limits<double>::max();
+  LandmarkObs closest_observation;
+
+  // For each predicted landmark
+  for (LandmarkObs predLandmark : predicted) {
+    // Run through each observed landmark
+    for (LandmarkObs obsLandmark : observations) {
+      // Calculate the Euclidean distance
+      distance = dist(predLandmark.x, predLandmark.y, obsLandmark.x, obsLandmark.y);
+      // Memorize the closest observation
+      if (distance < min_distance) {
+        min_distance = distance;
+        closest_observation = obsLandmark;
+      }
+    }
+    // Assign the observed measurement to the predicted landmark
+    predLandmark.id = closest_observation.id;
+    // Reset the minimum distance
+    min_distance = numeric_limits<double>::max();
+  }
 
 }
 
