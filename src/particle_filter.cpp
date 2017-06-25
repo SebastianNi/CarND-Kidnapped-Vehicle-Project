@@ -71,7 +71,6 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
   normal_distribution<double> dist_y(0.0, std_pos[1]);
   normal_distribution<double> dist_theta(0.0, std_pos[2]);
 
-
   if (abs(yaw_rate) > 0.00001) {
 
     // Calculate theta_dot_dt as well as velocity divided by yaw_rate outside the loop to save calculation time
@@ -79,16 +78,16 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
     double v_yr = velocity / yaw_rate;
 
     // Predict the new state for each particle and add the (Gaussian) noise
-    for (Particle particle : particles) {
+    for (Particle& particle : particles) {
       particle.x += v_yr * (sin(particle.theta + theta_dot_dt) - sin(particle.theta)) + dist_x(gen); // Noise is added at the end
       particle.y += v_yr * (cos(particle.theta) - cos(particle.theta + theta_dot_dt)) + dist_y(gen); // Noise is added at the end
-      particle.theta += theta_dot_dt; // Noise is added at the end
+      particle.theta += theta_dot_dt + dist_theta(gen); // Noise is added at the end
     }
 
   } else {
 
     // If the movement is nearly straight, avoid division by zero and use simpler formulas
-    for (Particle particle : particles) {
+    for (Particle& particle : particles) {
       particle.x += velocity * cos(particle.theta) * delta_t + dist_x(gen); // Noise is added at the end
       particle.y += velocity * sin(particle.theta) * delta_t + dist_y(gen); // Noise is added at the end
       particle.theta += dist_theta(gen); // Noise is added at the end
@@ -102,29 +101,27 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
 	// NOTE: this method will NOT be called by the grading code. But you will probably find it useful to 
 	//   implement this method and use it as a helper during the updateWeights phase.
 
-
   double distance;
   double min_distance = numeric_limits<double>::max();
-  LandmarkObs closest_observation;
+  LandmarkObs closest_landmark;
 
-  // For each predicted landmark
-  for (LandmarkObs pred_landmark : predicted) {
-    // Run through each observed landmark
-    for (LandmarkObs ob_landmark : observations) {
+  // For each observed landmark
+  for (LandmarkObs& obs_landmark : observations) {
+    // Run through each predicted landmark
+    for (LandmarkObs& pred_landmark : predicted) {
       // Calculate the Euclidean distance
-      distance = dist(pred_landmark.x, pred_landmark.y, ob_landmark.x, ob_landmark.y);
-      // Memorize the closest observation
+      distance = dist(obs_landmark.x, obs_landmark.y, pred_landmark.x, pred_landmark.y);
+      // Memorize the closest landmark
       if (distance < min_distance) {
         min_distance = distance;
-        closest_observation = ob_landmark;
+        closest_landmark = pred_landmark;
       }
     }
-    // Assign the observed measurement to the predicted landmark
-    pred_landmark.id = closest_observation.id;
+    // Assign the predicted landmark id to the observed landmark id
+    obs_landmark.id = closest_landmark.id;
     // Reset the minimum distance
     min_distance = numeric_limits<double>::max();
   }
-
 }
 
 void ParticleFilter::updateWeights(double sensor_range, double std_landmark[], 
@@ -139,6 +136,8 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 	//   and the following is a good resource for the actual equation to implement (look at equation 
 	//   3.33
 	//   http://planning.cs.uiuc.edu/node99.html
+
+
 }
 
 void ParticleFilter::resample() {
