@@ -137,7 +137,50 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 	//   3.33
 	//   http://planning.cs.uiuc.edu/node99.html
 
+  // Calculate the constant value for one over sqrt 2*PI to save calculation time
+  const double kOneOverSqrt2Pi = 1.0 / sqrt(2.0 * M_PI);
 
+  // Empty the weight vector and fill it up within the loop
+  weights.clear();
+
+  // Iterate through all particles and update the weight of each particle
+  for (Particle& particle : particles) {
+
+    // Transform (rotate and translate) the observations into map coordinates and store them in a new vector
+    vector<LandmarkObs> ops_in_map_coords;
+    double sin_theta = sin(particle.theta);
+    double cos_theta = cos(particle.theta);
+    for (LandmarkObs& observation : observations) {
+      ops_in_map_coords.push_back(LandmarkObs{observation.id,
+                                              observation.x * cos_theta - observation.y * sin_theta + particle.x,
+                                              observation.x * sin_theta + observation.y * cos_theta + particle.y});
+    }
+
+    // Get all landmarks within the range of the sensor
+    vector<LandmarkObs> landmarks_in_range;
+    for (Map::single_landmark_s& map_landmark : map_landmarks.landmark_list) {
+      // Calculate the Euclidean distance and compare it to the sensor range
+      if (dist(map_landmark.x_f, map_landmark.y_f, particle.x, particle.y) < sensor_range) {
+        // Convert the single landmark to a LandmarkObs and add it to the vector
+        landmarks_in_range.push_back(LandmarkObs{map_landmark.id_i, map_landmark.x_f, map_landmark.y_f});
+      }
+    }
+
+    // Associate the landmarks from the map with the observed landmarks.
+    dataAssociation(landmarks_in_range, ops_in_map_coords);
+
+    particle.weight = 1.0;
+    for (LandmarkObs& ob_in_map_coord : ops_in_map_coords) {
+      Map::single_landmark_s map_landmark = map_landmarks.landmark_list[ob_in_map_coord.id - 1];
+
+      // Calculate the probability for a two-dimensional Gaussian and multiply it with the current weight of the particle
+      double exponent = - pow(ob_in_map_coord.x - map_landmark.x_f, 2) / pow(std_landmark[0], 2) / 2.0  // x-part of the exponent
+                        - pow(ob_in_map_coord.y - map_landmark.y_f, 2) / pow(std_landmark[1], 2) / 2.0; // y-part of the exponent
+      particle.weight *= exp(exponent) * kOneOverSqrt2Pi / std_landmark[0] / std_landmark[1];
+    }
+    // Refill the weight vector
+    weights.push_back(particle.weight);
+  }
 }
 
 void ParticleFilter::resample() {
