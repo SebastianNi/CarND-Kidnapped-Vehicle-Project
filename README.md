@@ -1,3 +1,8 @@
+# Kidnapped Vehicle Project
+Self-Driving Car Engineer Nanodegree Program
+
+<img src="screenshot/kidnapped_vehicle.png" width="900" alt="Combined Image" />
+
 # Overview
 This repository contains all the code needed to complete the final project for the Localization course in Udacity's Self-Driving Car Nanodegree.
 
